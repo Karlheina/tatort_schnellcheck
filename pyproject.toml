@@ -45,6 +45,7 @@ ignore = [
     "TD003", # Missing issue link for this TODO
     "FIX002", # Line contains TODO, consider resolving the issue
     "CPY001", # Missing copyright notice at top of the file
+    "ANN" 
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
