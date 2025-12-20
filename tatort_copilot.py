@@ -20,25 +20,17 @@ wort_zahlen = {
 }
 
 
-# ---------------------------------------------------------
-# FUNKTION: EINEN ARTIKEL PARSEN
-# ---------------------------------------------------------
 def parse_artikel(url):
     print('Lade Artikel:', url)
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # -------------------------
-    # TITEL (alle Layouts)
-    # -------------------------
     titel_raw = None
 
-    # 1. Neuere Artikel: <h1>
     h1_tag = soup.find('h1')
     if h1_tag:
         titel_raw = h1_tag.get_text(strip=True)
 
-    # 2. Neu: <strong><em>…</em></strong>
     if titel_raw is None:
         strong_em = soup.find('strong')
         if strong_em:
@@ -46,7 +38,6 @@ def parse_artikel(url):
             if em:
                 titel_raw = em.get_text(strip=True)
 
-    # 3. Alt: <span class="spTextSmaller"><b>…</b></span>
     if titel_raw is None:
         titel_span = soup.find('span', class_='spTextSmaller')
         if titel_span:
@@ -54,7 +45,6 @@ def parse_artikel(url):
             if b:
                 titel_raw = b.get_text(strip=True)
 
-    # 4. Fallback: erster <strong>, aber NICHT "Das Szenario:"
     if titel_raw is None:
         strong = soup.find('strong')
         if strong:
@@ -62,12 +52,10 @@ def parse_artikel(url):
             if 'szenario' not in text.lower():
                 titel_raw = text
 
-    # Wenn immer noch nichts gefunden wurde → Artikel überspringen
     if titel_raw is None:
         print('  Kein Titel gefunden – überspringe diesen Artikel.')
         return None
 
-    # Titel bereinigen
     titel = (
         titel_raw.replace('»', '')
         .replace('«', '')
@@ -76,25 +64,16 @@ def parse_artikel(url):
         .strip()
     )
 
-    # -------------------------
-    # STADT / ERMITTLERTEAM
-    # -------------------------
     seiten_titel = None
     stadt_span = soup.find('span', class_='align-middle')
     if stadt_span:
         seiten_titel = stadt_span.get_text(strip=True)
 
-    # -------------------------
-    # JAHR
-    # -------------------------
     jahr = None
     time_tag = soup.find('time', class_='timeformat')
     if time_tag and 'datetime' in time_tag.attrs:
         jahr = time_tag['datetime'][:4]
 
-    # -------------------------
-    # BEWERTUNG (Text + Zahl)
-    # -------------------------
     bewertung_text = None
     bewertung = None
 
@@ -111,9 +90,6 @@ def parse_artikel(url):
             if match:
                 bewertung = int(match.group(1))
 
-    # -------------------------
-    # RETURN BLOCK (hat gefehlt!)
-    # -------------------------
     return {
         'titel': titel,
         'seiten_titel': seiten_titel,
@@ -124,9 +100,6 @@ def parse_artikel(url):
     }
 
 
-# ---------------------------------------------------------
-# SCHRITT 1: ALLE LINKS SAMMELN
-# ---------------------------------------------------------
 base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
 alle_links = set()
 page = 1
@@ -161,9 +134,7 @@ while True:
 
 print('\nGefundene Artikel insgesamt:', len(alle_links))
 
-# ---------------------------------------------------------
-# SCHRITT 2: ARTIKEL PARSEN
-# ---------------------------------------------------------
+
 alle_artikel = []
 
 for link in alle_links:
@@ -173,10 +144,9 @@ for link in alle_links:
 
 print('Erfolgreich geparste Artikel:', len(alle_artikel))
 
-# In Tabelle umwandeln
+
 df = pd.DataFrame(alle_artikel)
 
-# Als Excel-Datei speichern (für LibreOffice Calc geeignet)
 df.to_excel('tatort_schnellcheck.xlsx', index=False)
 
 print("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
