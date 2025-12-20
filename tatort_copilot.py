@@ -24,7 +24,7 @@ wort_zahlen = {
 }
 
 
-def parse_artikel(url: set) -> dict:  # noqa: C901, PLR0912, PLR0914
+def parse_artikel(url):  # noqa: C901, PLR0912, PLR0914
     logger.info('Lade Artikel: %s', url)
     response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
