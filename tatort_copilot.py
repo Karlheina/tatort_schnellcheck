@@ -1,8 +1,12 @@
+import logging
 import re
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger('tatort_copilot')
+logger.setLevel(logging.DEBUG)
 
 wort_zahlen = {
     'null': 0,
@@ -20,9 +24,9 @@ wort_zahlen = {
 }
 
 
-def parse_artikel(url):
-    print('Lade Artikel:', url)
-    response = requests.get(url)
+def parse_artikel(url: set) -> dict:
+    logger.info('Lade Artikel: %s', url)
+    response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     titel_raw = None
@@ -53,7 +57,7 @@ def parse_artikel(url):
                 titel_raw = text
 
     if titel_raw is None:
-        print('  Kein Titel gefunden – überspringe diesen Artikel.')
+        logger.info('  Kein Titel gefunden - überspringe diesen Artikel.')
         return None
 
     titel = (
@@ -105,13 +109,10 @@ alle_links = set()
 page = 1
 
 while True:
-    if page == 1:
-        url = base_url
-    else:
-        url = f'{base_url}p{page}/'
+    url = base_url if page == 1 else f'{base_url}p{page}/'
 
-    print('Lade Seite:', url)
-    response = requests.get(url)
+    logger.info('Lade Seite: %s', url)
+    response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     artikel_spans = soup.find_all('span', class_='align-middle')
@@ -127,12 +128,12 @@ while True:
     nachher = len(alle_links)
 
     if nachher == vorher:
-        print('Keine neuen Links mehr gefunden. Stoppe.')
+        logger.info('Keine neuen Links mehr gefunden. Stoppe.')
         break
 
     page += 1
 
-print('\nGefundene Artikel insgesamt:', len(alle_links))
+logger.info('\nGefundene Artikel insgesamt: %d', len(alle_links))
 
 
 alle_artikel = []
@@ -142,11 +143,11 @@ for link in alle_links:
     if daten is not None:
         alle_artikel.append(daten)
 
-print('Erfolgreich geparste Artikel:', len(alle_artikel))
+logger.info('Erfolgreich geparste Artikel: %d', len(alle_artikel))
 
 
 df = pd.DataFrame(alle_artikel)
 
 df.to_excel('tatort_schnellcheck.xlsx', index=False)
 
-print("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
+logger.info("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
