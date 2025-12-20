@@ -1,6 +1,8 @@
 
 import requests
 from bs4 import BeautifulSoup
+import re
+import pandas as pd
 
 wort_zahlen = {
     "null": 0, "eins": 1, "eine": 1, "zwei": 2, "drei": 3, "vier": 4,
@@ -79,8 +81,6 @@ def parse_artikel(url):
     time_tag = soup.find("time", class_="timeformat")
     if time_tag and "datetime" in time_tag.attrs:
         jahr = time_tag["datetime"][:4]
-
-    import re
     
     # -------------------------
     # BEWERTUNG (Text + Zahl)
@@ -148,7 +148,6 @@ while True:
 
 print("\nGefundene Artikel insgesamt:", len(alle_links))
 
-
 # ---------------------------------------------------------
 # SCHRITT 2: ARTIKEL PARSEN
 # ---------------------------------------------------------
@@ -160,8 +159,6 @@ for link in alle_links:
         alle_artikel.append(daten)
 
 print("Erfolgreich geparste Artikel:", len(alle_artikel))
-
-import pandas as pd
 
 # In Tabelle umwandeln
 df = pd.DataFrame(alle_artikel)
