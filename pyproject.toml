@@ -5,8 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "pandas>=2.3.3",
     "pre-commit>=4.2.0",
     "prek>=0.2.23",
+    "requests>=2.32.5",
     "ty>=0.0.5",
 ]
 
@@ -42,7 +45,6 @@ ignore = [
     "TD003", # Missing issue link for this TODO
     "FIX002", # Line contains TODO, consider resolving the issue
     "CPY001", # Missing copyright notice at top of the file
-    "ANN" # Type annotations
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
