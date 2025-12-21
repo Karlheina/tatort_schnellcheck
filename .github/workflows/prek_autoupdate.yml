@@ -3,7 +3,7 @@ name: Prek autoupdate
 on:
   push:
     branches:
-      - main
+      - add_pre_commit
   workflow_dispatch:
 
 permissions:
