@@ -31,4 +31,3 @@ jobs:
             Automated update of prek hooks.
           branch: prek-autoupdate
           delete-branch: true
-
