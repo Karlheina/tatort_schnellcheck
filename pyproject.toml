@@ -1,0 +1,100 @@
+[project]
+name = "tatort_schnellcheck"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "pandas>=2.3.3",
+    "pre-commit>=4.2.0",
+    "prek>=0.2.23",
+    "requests>=2.32.5",
+    "ty>=0.0.5",
+]
+
+[tool.ruff]
+target-version =  "py310"
+line-length = 88
+indent-width = 4
+
+namespace-packages=[""]
+[tool.ruff.lint]
+select = ["ALL"]
+
+ignore = [
+
+    ######## Checks below this line are ignored on purpose ########
+    "ISC001", # Checks for implicitly concatenated strings on a single line. @NilsIseke: Ignored on purpose as it may cause conflicts with formatter
+    "COM812", # Checks for the absence of trailing commas. @NilsIseke: Ignored on purpose as it may cause conflicts with formatter
+    "TC002", "TC003", # Check if ignore is still feasible
+    "S311",  # Non-cryptographic random generator
+    "S101",  # Checks for uses of the assert keyword.
+    "D100",  #Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in internal method
+    "D104",  # Missing docstring in special method
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in function
+    "D205",  # 1 blank line required between summary line and description
+    "D400",  # Checks for docstrings in which the first line does not end in a period.
+    "D401",  # First line of docstring should be in imperative mood
+    "D404",   # First word of docstring should be in imperative mood
+    "E501", # Line length. We have ruff-format (ruff-format seems not to work on # comments) @NilsIseke did not find an autofix for this, therefore ignoring.
+    "TD003", # Missing issue link for this TODO
+    "FIX002", # Line contains TODO, consider resolving the issue
+    "CPY001", # Missing copyright notice at top of the file
+    "ANN"
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+extend-select = ["D212"]
+
+# Turn on preview to activate more ruff checks
+preview = true
+explicit-preview-rules = false
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+
+[tool.ruff.lint.per-file-ignores]
+"" = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+[tool.ruff.format]
+quote-style = "single"
+
+indent-style = "space"
+
+skip-magic-trailing-comma = false
+
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+docstring-code-format = true
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"**/tests/*.py" = [
+    "ARG", # Unused function args -> fixtures nevertheless are functionally relevant...
+    "FBT", # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
+    "INP001", # Tests do not need to be proper packages
+]
