@@ -7,6 +7,14 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger('tatort_copilot')
 logger.setLevel(logging.DEBUG)
 
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+
 def parse_article(url):  # noqa: C901, PLR0912, PLR0914
     logger.info('Lade Artikel: %s', url)
     response = requests.get(url, timeout=100)
@@ -124,7 +132,7 @@ def collect_links(base_url):
     logger.info('\nGefundene Artikel insgesamt: %d', len(all_links))
     return all_links
 
-def scarpe_all_articles(links):
+def scrape_all_articles(links):
     all_articles = []
 
     for link in links:
@@ -137,13 +145,13 @@ def scarpe_all_articles(links):
 
 def save_to_table (data, filename):
     df = pd.DataFrame(data)
-    df.to_excel('tatort_schnellcheck.xlsx', index=False)
+    df.to_excel(filename, index=False)
     logger.info("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
 
 def run_scraper():
     base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
     links = collect_links(base_url)
-    articles = scarpe_all_articles(links)
+    articles = scrape_all_articles(links)
     save_to_table(articles, "tatort_schnellcheck.xlsx")
 
 if __name__ == "__main__":
