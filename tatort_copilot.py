@@ -8,103 +8,94 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger('tatort_copilot')
 logger.setLevel(logging.DEBUG)
 
-wort_zahlen = {
-    'null': 0,
-    'eins': 1,
-    'eine': 1,
-    'zwei': 2,
-    'drei': 3,
-    'vier': 4,
-    'fünf': 5,
-    'sechs': 6,
-    'sieben': 7,
-    'acht': 8,
-    'neun': 9,
-    'zehn': 10,
-}
-
-
-def parse_artikel(url):  # noqa: C901, PLR0912, PLR0914
+def parse_article(url):  # noqa: C901, PLR0912, PLR0914
     logger.info('Lade Artikel: %s', url)
     response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    titel_raw = None
+    def extract_episode_title(h1_text):
+        if ":" in h1_text:
+            after_colon = h1_text.split(":", 1)[1]
+        else:
+            after_colon = h1_text
+
+        match = re.search(r'[\"»„“](.*?)[\"«”]', after_colon)
+        if match:
+            return match.group(1).strip()
+        return None
+    
+    title_raw = None
 
     h1_tag = soup.find('h1')
     if h1_tag:
-        titel_raw = h1_tag.get_text(strip=True)
+        h1_text = h1_tag.get_text(strip=True)
+        extracted = extract_episode_title(h1_text)
+        if extracted:
+            title_raw = extracted
 
-    if titel_raw is None:
-        strong_em = soup.find('strong')
-        if strong_em:
-            em = strong_em.find('em')
-            if em:
-                titel_raw = em.get_text(strip=True)
-
-    if titel_raw is None:
-        titel_span = soup.find('span', class_='spTextSmaller')
-        if titel_span:
-            b = titel_span.find('b')
+    if title_raw is None:
+        title_span = soup.find('span', class_='spTextSmaller')
+        if title_span:
+            b = title_span.find('b')
             if b:
-                titel_raw = b.get_text(strip=True)
+                title_raw = b.get_text(strip=True)
 
-    if titel_raw is None:
-        strong = soup.find('strong')
-        if strong:
-            text = strong.get_text(strip=True)
-            if 'szenario' not in text.lower():
-                titel_raw = text
-
-    if titel_raw is None:
+    if title_raw is None:
         logger.info('  Kein Titel gefunden - überspringe diesen Artikel.')
         return None
 
-    titel = (
-        titel_raw.replace('»', '')
+    title = (
+        title_raw.replace('»', '')
         .replace('«', '')
         .replace('"', '')
         .replace(',', '')
         .strip()
     )
 
-    seiten_titel = None
-    stadt_span = soup.find('span', class_='align-middle')
-    if stadt_span:
-        seiten_titel = stadt_span.get_text(strip=True)
+    def extract_city_from_h1(h1_text):
+        words = h1_text.split()
+        for i, w in enumerate(words):
+             if w.lower() == "aus" and i + 1 < len(words):
+                  return words[i + 1].strip('":«»„“')
+        return None
 
-    jahr = None
+    city = None
+    if h1_tag:
+        h1_text = h1_tag.get_text(strip=True)
+        city = extract_city_from_h1(h1_text) 
+
+    year = None
     time_tag = soup.find('time', class_='timeformat')
     if time_tag and 'datetime' in time_tag.attrs:
-        jahr = time_tag['datetime'][:4]
+        year = time_tag['datetime'][:4]
 
-    bewertung_text = None
-    bewertung = None
+    evaluation_text = None
+    evaluation = None
 
-    bewertung_header = soup.find(
+    evaluation_header = soup.find(
         ['strong', 'b'], string=lambda s: s and 'Bewertung' in s
     )
-    if bewertung_header:
-        p_tag = bewertung_header.find_parent().find_next('p')
+    if evaluation_header:
+        p_tag = evaluation_header.find_parent().find_next('p')
         if p_tag:
-            bewertung_text = p_tag.get_text(strip=True)
+            evaluation_text = p_tag.get_text(strip=True)
 
-            match = re.search(r'\b(\d{1,2})\b', bewertung_text)
+            match = re.search(r'\b(\d{1,2})\b', evaluation_text)
             if match:
-                bewertung = int(match.group(1))
+                evaluation = int(match.group(1))
 
     return {
-        'titel': titel,
-        'seiten_titel': seiten_titel,
-        'jahr': jahr,
-        'bewertung_text': bewertung_text,
-        'bewertung': bewertung,
-        'url': url,
+        'Titel': title,
+        'Stadt': city,
+        'Jahr': year,
+        'Bewertungstext': evaluation_text,
+        'Bewertung': evaluation,
+        'Link': url,
     }
 
 
 base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
-alle_links = set()
+all_links = set()
 page = 1
 
 while True:
@@ -114,38 +105,37 @@ while True:
     response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    artikel_spans = soup.find_all('span', class_='align-middle')
-    links_dieser_seite = set()
+    article_spans = soup.find_all('span', class_='align-middle')
+    links_of_this_page = set()
 
-    for span in artikel_spans:
+    for span in article_spans:
         a_tag = span.find_parent('a')
         if a_tag and 'href' in a_tag.attrs:
-            links_dieser_seite.add(a_tag['href'])
+            links_of_this_page.add(a_tag['href'])
 
-    vorher = len(alle_links)
-    alle_links.update(links_dieser_seite)
-    nachher = len(alle_links)
+    before = len(all_links)
+    all_links.update(links_of_this_page)
+    after = len(all_links)
 
-    if nachher == vorher:
+    if after == before:
         logger.info('Keine neuen Links mehr gefunden. Stoppe.')
         break
 
     page += 1
 
-logger.info('\nGefundene Artikel insgesamt: %d', len(alle_links))
+logger.info('\nGefundene Artikel insgesamt: %d', len(all_links))
+
+all_articles = []
+
+for link in all_links:
+    data = parse_article(link)
+    if data is not None:
+        all_articles.append(data)
+
+logger.info('Erfolgreich geparste Artikel: %d', len(all_articles))
 
 
-alle_artikel = []
-
-for link in alle_links:
-    daten = parse_artikel(link)
-    if daten is not None:
-        alle_artikel.append(daten)
-
-logger.info('Erfolgreich geparste Artikel: %d', len(alle_artikel))
-
-
-df = pd.DataFrame(alle_artikel)
+df = pd.DataFrame(all_articles)
 
 df.to_excel('tatort_schnellcheck.xlsx', index=False)
 
