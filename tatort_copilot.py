@@ -15,49 +15,58 @@ console_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 
+def extract_episode_title(text):
+    if not text:
+        return None
+
+    # Entferne äußere Leerzeichen und Kommas
+    cleaned = text.strip().strip(',')
+
+    # Wenn "Tatort:" oder "Polizeiruf:" enthalten ist → alles danach ist der Episodentitel
+    for prefix in ["Tatort:", "Polizeiruf:"]:
+        if prefix in cleaned:
+            return cleaned.split(prefix, 1)[1].strip()
+
+    # Finde ALLE Titel in Anführungszeichen (alle Varianten)
+    quote_pattern = r'[\"\'»«„“](.*?)[\"\'«»“”]'
+    matches = re.findall(quote_pattern, cleaned)
+
+    if matches:
+        return matches[-1].strip()  # Nimm den letzten Treffer
+
+    # Fallback: Titel nach dem letzten Doppelpunkt
+    if ":" in cleaned:
+        return cleaned.rsplit(":", 1)[-1].strip()
+
+    return cleaned
+
 def parse_article(url):  # noqa: C901, PLR0912, PLR0914
     logger.info('Lade Artikel: %s', url)
     response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    def extract_episode_title(h1_text):
-        if ":" in h1_text:
-            after_colon = h1_text.split(":", 1)[1]
-        else:
-            after_colon = h1_text
-
-        match = re.search(r'[\"»„“](.*?)[\"«”]', after_colon)
-        if match:
-            return match.group(1).strip()
-        return None
-    
     title_raw = None
 
+    # 1) Neuer Tatort/Polizeiruf: Titel aus <h1>
     h1_tag = soup.find('h1')
     if h1_tag:
-        h1_text = h1_tag.get_text(strip=True)
-        extracted = extract_episode_title(h1_text)
-        if extracted:
-            title_raw = extracted
+        title_raw = extract_episode_title(h1_tag.get_text(strip=True))
 
+    # 2) Alter Tatort/Polizeiruf: Titel aus <span class="spTextSmaller"><b>…</b></span>
     if title_raw is None:
         title_span = soup.find('span', class_='spTextSmaller')
         if title_span:
             b = title_span.find('b')
             if b:
-                title_raw = b.get_text(strip=True)
+                title_raw = extract_episode_title(b.get_text(strip=True))
 
+    # 3) Wenn immer noch kein Titel gefunden wurde → Artikel überspringen
     if title_raw is None:
         logger.info('  Kein Titel gefunden - überspringe diesen Artikel.')
         return None
 
-    title = (
-        title_raw.replace('»', '')
-        .replace('«', '')
-        .replace('"', '')
-        .replace(',', '')
-        .strip()
-    )
+    # 4) Finale Bereinigung (meist nicht mehr nötig, aber sicher)
+    title = title_raw.strip()
 
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
