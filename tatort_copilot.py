@@ -1,6 +1,5 @@
 import logging
 import re
-
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -55,8 +54,8 @@ def parse_article(url):  # noqa: C901, PLR0912, PLR0914
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
         for i, w in enumerate(words):
-             if w.lower() == "aus" and i + 1 < len(words):
-                  return words[i + 1].strip('":«»„“')
+            if w.lower() == "aus" and i + 1 < len(words):
+                return words[i + 1].strip('":«»„“')
         return None
 
     city = None
@@ -93,50 +92,59 @@ def parse_article(url):  # noqa: C901, PLR0912, PLR0914
         'Link': url,
     }
 
+def collect_links(base_url):
+    all_links = set()
+    page = 1
 
-base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
-all_links = set()
-page = 1
+    while True:
+        url = base_url if page == 1 else f'{base_url}p{page}/'
 
-while True:
-    url = base_url if page == 1 else f'{base_url}p{page}/'
+        logger.info('Lade Seite: %s', url)
+        response = requests.get(url, timeout=100)
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-    logger.info('Lade Seite: %s', url)
-    response = requests.get(url, timeout=100)
-    soup = BeautifulSoup(response.text, 'html.parser')
+        article_spans = soup.find_all('span', class_='align-middle')
+        links_of_this_page = set()
 
-    article_spans = soup.find_all('span', class_='align-middle')
-    links_of_this_page = set()
+        for span in article_spans:
+            a_tag = span.find_parent('a')
+            if a_tag and 'href' in a_tag.attrs:
+                links_of_this_page.add(a_tag['href'])
 
-    for span in article_spans:
-        a_tag = span.find_parent('a')
-        if a_tag and 'href' in a_tag.attrs:
-            links_of_this_page.add(a_tag['href'])
+        before = len(all_links)
+        all_links.update(links_of_this_page)
+        after = len(all_links)
 
-    before = len(all_links)
-    all_links.update(links_of_this_page)
-    after = len(all_links)
+        if after == before:
+            logger.info('Keine neuen Links mehr gefunden. Stoppe.')
+            break
 
-    if after == before:
-        logger.info('Keine neuen Links mehr gefunden. Stoppe.')
-        break
+        page += 1
 
-    page += 1
+    logger.info('\nGefundene Artikel insgesamt: %d', len(all_links))
+    return all_links
 
-logger.info('\nGefundene Artikel insgesamt: %d', len(all_links))
+def scarpe_all_articles(links):
+    all_articles = []
 
-all_articles = []
+    for link in links:
+        data = parse_article(link)
+        if data is not None:
+            all_articles.append(data)
 
-for link in all_links:
-    data = parse_article(link)
-    if data is not None:
-        all_articles.append(data)
+    logger.info('Erfolgreich geparste Artikel: %d', len(all_articles))
+    return all_articles
 
-logger.info('Erfolgreich geparste Artikel: %d', len(all_articles))
+def save_to_table (data, filename):
+    df = pd.DataFrame(data)
+    df.to_excel('tatort_schnellcheck.xlsx', index=False)
+    logger.info("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
 
+def run_scraper():
+    base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
+    links = collect_links(base_url)
+    articles = scarpe_all_articles(links)
+    save_to_table(articles, "tatort_schnellcheck.xlsx")
 
-df = pd.DataFrame(all_articles)
-
-df.to_excel('tatort_schnellcheck.xlsx', index=False)
-
-logger.info("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
+if __name__ == "__main__":
+    run_scraper()
