@@ -1,29 +1,44 @@
 import re
+from bs4 import BeautifulSoup
 
-def extract_episode_title(text):
-    if not text:
+def extract_title_from_page_end(soup):
+    text = soup.get_text(" ", strip=True)
+
+    prefixes = ["Tatort:", "Polizeiruf:"]
+
+    candidates = []
+
+    for prefix in prefixes:
+        if prefix in text:
+            after = text.split(prefix, 1)[1].strip()
+
+            m = re.search(r'[\"»„“](.*?)[\"«”]', after)
+            if m:
+                candidates.append(prefix + " " + m.group(1).strip())
+                continue
+
+            m = re.match(r'([^.,;!?]+)', after)
+            if m:
+                candidates.append(prefix + " " + m.group(1).strip())
+                continue
+
+            first_word = after.split()[0]
+            candidates.append(prefix + " " + first_word)
+
+    if not candidates:
         return None
 
-    # Entferne äußere Leerzeichen und Kommas
-    cleaned = text.strip().strip(',')
+    return max(candidates, key=len)
 
-    # Wenn "Tatort:" oder "Polizeiruf:" enthalten ist → alles danach ist der Episodentitel
-    for prefix in ["Tatort:", "Polizeiruf:"]:
-        if prefix in cleaned:
-            return cleaned.split(prefix, 1)[1].strip()
+test_titles = [
+    "Tatort: „Der dunkle Wald“",
+    "Polizeiruf: Der stille Gast",
+    "Tatort: Ein Fall ohne Anführungszeichen",
+    "Tatort: Der Wald – Ein neuer Fall",
+    "Kein Tatort hier"
+    "»Tatort: Murot und das 1000-jährige Reich«, Sonntag, 20.15 Uhr, Das Erste"
+]
 
-    # Finde ALLE Titel in Anführungszeichen (alle Varianten)
-    quote_pattern = r'[\"\'»«„“](.*?)[\"\'«»“”]'
-    matches = re.findall(quote_pattern, cleaned)
-
-    if matches:
-        return matches[-1].strip()  # Nimm den letzten Treffer
-
-    # Fallback: Titel nach dem letzten Doppelpunkt
-    if ":" in cleaned:
-        return cleaned.rsplit(":", 1)[-1].strip()
-
-    return cleaned
-
-title = extract_episode_title('»Tatort: In der Familie (2)«')
-print(title)
+for t in test_titles:
+    soup = BeautifulSoup(f"<p>{t}</p>", "html.parser")
+    print(t, "→", extract_title_from_page_end(soup))

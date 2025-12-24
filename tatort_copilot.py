@@ -15,58 +15,61 @@ console_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 
-def extract_episode_title(text):
-    if not text:
+def find_raw_title_in_html(soup):
+    page_text = soup.get_text(" ", strip=True)
+
+    prefix_series = ["Tatort:", "Polizeiruf:"]
+    for prefix in prefix_series:
+        if prefix in page_text:
+            raw_title = page_text.split(prefix, 1)[1].strip()
+            return prefix, raw_title
+
+    return None, None
+
+def clean_episode_title(prefix, raw_title):
+    if not raw_title:
         return None
 
-    # Entferne äußere Leerzeichen und Kommas
-    cleaned = text.strip().strip(',')
+    if ", Sonntag" in raw_title:
+        return f"{prefix} {raw_title.split(', Sonntag', 1)[0].strip()}"
 
-    # Wenn "Tatort:" oder "Polizeiruf:" enthalten ist → alles danach ist der Episodentitel
-    for prefix in ["Tatort:", "Polizeiruf:"]:
-        if prefix in cleaned:
-            return cleaned.split(prefix, 1)[1].strip()
+    m = re.search(r'[\"»„“](.*?)[\"«”]', raw_title)
+    if m:
+        return f"{prefix} {m.group(1).strip()}"
+    
+    return f"{prefix} {raw_title}"
+    
+def extract_episode_title(soup):
+    prefix, raw_title = find_raw_title_in_html(soup)
+    if not raw_title:
+        return None
+    return clean_episode_title(prefix, raw_title)
 
-    # Finde ALLE Titel in Anführungszeichen (alle Varianten)
-    quote_pattern = r'[\"\'»«„“](.*?)[\"\'«»“”]'
-    matches = re.findall(quote_pattern, cleaned)
-
-    if matches:
-        return matches[-1].strip()  # Nimm den letzten Treffer
-
-    # Fallback: Titel nach dem letzten Doppelpunkt
-    if ":" in cleaned:
-        return cleaned.rsplit(":", 1)[-1].strip()
-
-    return cleaned
-
-def parse_article(url):  # noqa: C901, PLR0912, PLR0914
+def parse_article(url):
     logger.info('Lade Artikel: %s', url)
     response = requests.get(url, timeout=100)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    title_raw = None
-
-    # 1) Neuer Tatort/Polizeiruf: Titel aus <h1>
     h1_tag = soup.find('h1')
-    if h1_tag:
-        title_raw = extract_episode_title(h1_tag.get_text(strip=True))
 
-    # 2) Alter Tatort/Polizeiruf: Titel aus <span class="spTextSmaller"><b>…</b></span>
-    if title_raw is None:
-        title_span = soup.find('span', class_='spTextSmaller')
-        if title_span:
-            b = title_span.find('b')
-            if b:
-                title_raw = extract_episode_title(b.get_text(strip=True))
-
-    # 3) Wenn immer noch kein Titel gefunden wurde → Artikel überspringen
-    if title_raw is None:
-        logger.info('  Kein Titel gefunden - überspringe diesen Artikel.')
+    title_raw = extract_episode_title(soup)
+    if not title_raw:
+        logger.info("Kein Titel gefunden – überspringe Artikel.")
         return None
 
-    # 4) Finale Bereinigung (meist nicht mehr nötig, aber sicher)
     title = title_raw.strip()
+
+    def extract_city_from_h1(h1_text):
+        words = h1_text.split()
+        for i, w in enumerate(words):
+            if w.lower() == "aus" and i + 1 < len(words):
+                return words[i + 1].strip('":«»„“')
+        return None
+
+    city = None
+    if 'h1_tag' in locals() and h1_tag:
+        h1_text = h1_tag.get_text(strip=True)
+        city = extract_city_from_h1(h1_text)
 
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
