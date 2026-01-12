@@ -15,35 +15,85 @@ console_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 
-def find_raw_title_in_html(soup):
+NUMBER_WORDS = {
+    "null": 0,
+    "eins": 1, "eine": 1, "einem": 1, "einen": 1,
+    "zwei": 2,
+    "drei": 3,
+    "vier": 4,
+    "fünf": 5,
+    "sechs": 6,
+    "sieben": 7,
+    "acht": 8,
+    "neun": 9,
+    "zehn": 10,
+}
+
+def extract_title_from_bottom(soup):
     page_text = soup.get_text(" ", strip=True)
 
-    prefix_series = ["Tatort:", "Polizeiruf:"]
-    for prefix in prefix_series:
-        if prefix in page_text:
-            raw_title = page_text.split(prefix, 1)[1].strip()
-            return prefix, raw_title
+    for prefix in ["Tatort:", "Polizeiruf:", "Polizeiruf 110:"]:
+        if prefix not in page_text:
+            continue
 
-    return None, None
+        # 1. Fall: Anführungszeichen VOR dem Präfix
+        m_outer = re.search(r'[\"»„“]\s*' + prefix + r'\s*(.*?)[\"«”]', page_text)
+        if m_outer:
+            return f"{prefix} {m_outer.group(1).strip()}"
 
-def clean_episode_title(prefix, raw_title):
-    if not raw_title:
-        return None
+        # 2. Normalfall: Text nach dem Präfix
+        raw_title = page_text.rsplit(prefix, 1)[1].strip()
 
-    if ", Sonntag" in raw_title:
-        return f"{prefix} {raw_title.split(', Sonntag', 1)[0].strip()}"
+        # 3. Endmarker: 20:15 oder andere Uhrzeiten
+        m_time = re.search(r'(.*?)(\d{1,2}[:.]\d{2})', raw_title)
+        if m_time:
+            return f"{prefix} {m_time.group(1).strip()}"
 
-    m = re.search(r'[\"»„“](.*?)[\"«”]', raw_title)
+        # 5. Titel in Anführungszeichen
+        m_inner = re.search(r'[\"»„“](.*?)[\"«”]', raw_title)
+        if m_inner:
+            return f"{prefix} {m_inner.group(1).strip()}"
+
+        # 6. Fallback
+        return f"{prefix} {raw_title}"
+
+    return None
+
+def extract_title_from_h1(soup):
+    h1 = soup.find("h1")
+    if not h1:
+         return None
+     
+    text = h1.get_text(" ", strip=True)
+
+    m = re.search(r'[»„“"]\s*Tatort\s*[«“”"]\D*?[»„“"](.+?)[«“”"]', text)
     if m:
-        return f"{prefix} {m.group(1).strip()}"
+        return f"Tatort: {m.group(1).strip()}"
     
-    return f"{prefix} {raw_title}"
+    m = re.search(r'Tatort[^\w]+[»„“"](.+?)[«“”"]', text)
+    if m:
+        return f"Tatort: {m.group(1).strip()}"
     
-def extract_episode_title(soup):
-    prefix, raw_title = find_raw_title_in_html(soup)
-    if not raw_title:
+    m = re.search(r'Polizeiruf.*?:\s*([A-Za-zÄÖÜäöüß0-9\- ]+)', text)
+    if m:
+        return f"Polizeiruf: {m.group(1).strip()}"
+    
+    return None
+
+def extract_evaluation(evaluation_text):
+    m = re.search(r'(\w+)\s+von\b', evaluation_text.lower())
+    if not m:
         return None
-    return clean_episode_title(prefix, raw_title)
+
+    first_part = m.group(1)
+
+    if first_part.isdigit():
+        return int(first_part)
+
+    if first_part in NUMBER_WORDS:
+        return NUMBER_WORDS[first_part]
+
+    return None
 
 def parse_article(url):
     logger.info('Lade Artikel: %s', url)
@@ -52,12 +102,18 @@ def parse_article(url):
 
     h1_tag = soup.find('h1')
 
-    title_raw = extract_episode_title(soup)
-    if not title_raw:
-        logger.info("Kein Titel gefunden – überspringe Artikel.")
-        return None
+    title_raw = extract_title_from_bottom(soup) 
 
-    title = title_raw.strip()
+    if not title_raw:
+        title_raw = extract_title_from_h1(soup)
+
+    
+    if not title_raw:
+        logger.info("Kein Titel gefunden für URL: %s", url)
+        title = None
+
+    else:
+        title = title_raw.strip()
 
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
@@ -92,16 +148,13 @@ def parse_article(url):
     evaluation = None
 
     evaluation_header = soup.find(
-        ['strong', 'b'], string=lambda s: s and 'Bewertung' in s
+        string=lambda s: s and 'Bewertung' in s
     )
     if evaluation_header:
         p_tag = evaluation_header.find_parent().find_next('p')
         if p_tag:
             evaluation_text = p_tag.get_text(strip=True)
-
-            match = re.search(r'\b(\d{1,2})\b', evaluation_text)
-            if match:
-                evaluation = int(match.group(1))
+            evaluation = extract_evaluation(evaluation_text)
 
     return {
         'Titel': title,

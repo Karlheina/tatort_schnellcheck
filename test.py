@@ -1,44 +1,50 @@
-import re
+
 from bs4 import BeautifulSoup
+import re
+import requests
 
-def extract_title_from_page_end(soup):
-    text = soup.get_text(" ", strip=True)
+NUMBER_WORDS = {
+    "null": 0,
+    "eins": 1, "eine": 1, "einem": 1, "einen": 1,
+    "zwei": 2,
+    "drei": 3,
+    "vier": 4,
+    "fünf": 5,
+    "sechs": 6,
+    "sieben": 7,
+    "acht": 8,
+    "neun": 9,
+    "zehn": 10,
+}
 
-    prefixes = ["Tatort:", "Polizeiruf:"]
-
-    candidates = []
-
-    for prefix in prefixes:
-        if prefix in text:
-            after = text.split(prefix, 1)[1].strip()
-
-            m = re.search(r'[\"»„“](.*?)[\"«”]', after)
-            if m:
-                candidates.append(prefix + " " + m.group(1).strip())
-                continue
-
-            m = re.match(r'([^.,;!?]+)', after)
-            if m:
-                candidates.append(prefix + " " + m.group(1).strip())
-                continue
-
-            first_word = after.split()[0]
-            candidates.append(prefix + " " + first_word)
-
-    if not candidates:
+def extract_evaluation(evaluation_text):
+    m = re.search(r'(\w+)\s+von\b', evaluation_text.lower())
+    if not m:
         return None
 
-    return max(candidates, key=len)
+    first_part = m.group(1)
 
-test_titles = [
-    "Tatort: „Der dunkle Wald“",
-    "Polizeiruf: Der stille Gast",
-    "Tatort: Ein Fall ohne Anführungszeichen",
-    "Tatort: Der Wald – Ein neuer Fall",
-    "Kein Tatort hier"
-    "»Tatort: Murot und das 1000-jährige Reich«, Sonntag, 20.15 Uhr, Das Erste"
-]
+    if first_part.isdigit():
+        return int(first_part)
 
-for t in test_titles:
-    soup = BeautifulSoup(f"<p>{t}</p>", "html.parser")
-    print(t, "→", extract_title_from_page_end(soup))
+    if first_part in NUMBER_WORDS:
+        return NUMBER_WORDS[first_part]
+
+    return None
+
+test_url = 'https://www.spiegel.de/kultur/tv/tatort-aus-muenchen-one-way-ticket-im-schnellcheck-a-1296721.html'
+
+response = requests.get(test_url, timeout=100)
+soup = BeautifulSoup(response.text, 'html.parser')
+
+evaluation_header = soup.find(
+        string=lambda s: s and 'Bewertung' in s
+    )
+if evaluation_header:
+    p_tag = evaluation_header.find_parent().find_next('p')
+    if p_tag:
+        evaluation_text = p_tag.get_text(strip=True)
+        evaluation = extract_evaluation(evaluation_text)
+
+print (evaluation_text)
+print (evaluation)
