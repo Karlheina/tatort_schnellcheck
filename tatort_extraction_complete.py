@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-logger = logging.getLogger('tatort_copilot')
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 console_handler = logging.StreamHandler()
@@ -16,30 +16,36 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 NUMBER_WORDS = {
-    "null": 0,
-    "eins": 1, "eine": 1, "einem": 1, "einen": 1,
-    "zwei": 2,
-    "drei": 3,
-    "vier": 4,
-    "fünf": 5,
-    "sechs": 6,
-    "sieben": 7,
-    "acht": 8,
-    "neun": 9,
-    "zehn": 10,
+    'null': 0,
+    'ein': 1,
+    'eins': 1,
+    'eine': 1,
+    'einem': 1,
+    'einen': 1,
+    'einer': 1,
+    'zwei': 2,
+    'drei': 3,
+    'vier': 4,
+    'fünf': 5,
+    'sechs': 6,
+    'sieben': 7,
+    'acht': 8,
+    'neun': 9,
+    'zehn': 10,
 }
 
-def extract_title_from_bottom(soup):
-    page_text = soup.get_text(" ", strip=True)
 
-    for prefix in ["Tatort:", "Polizeiruf:", "Polizeiruf 110:"]:
+def extract_title_from_bottom(soup):
+    page_text = soup.get_text(' ', strip=True)
+
+    for prefix in ['Tatort:', 'Polizeiruf:', 'Polizeiruf 110:']:
         if prefix not in page_text:
             continue
 
         # 1. Fall: Anführungszeichen VOR dem Präfix
         m_outer = re.search(r'[\"»„“]\s*' + prefix + r'\s*(.*?)[\"«”]', page_text)
         if m_outer:
-            return f"{prefix} {m_outer.group(1).strip()}"
+            return f'{prefix} {m_outer.group(1).strip()}'
 
         # 2. Normalfall: Text nach dem Präfix
         raw_title = page_text.rsplit(prefix, 1)[1].strip()
@@ -47,38 +53,40 @@ def extract_title_from_bottom(soup):
         # 3. Endmarker: 20:15 oder andere Uhrzeiten
         m_time = re.search(r'(.*?)(\d{1,2}[:.]\d{2})', raw_title)
         if m_time:
-            return f"{prefix} {m_time.group(1).strip()}"
+            return f'{prefix} {m_time.group(1).strip()}'
 
         # 5. Titel in Anführungszeichen
         m_inner = re.search(r'[\"»„“](.*?)[\"«”]', raw_title)
         if m_inner:
-            return f"{prefix} {m_inner.group(1).strip()}"
+            return f'{prefix} {m_inner.group(1).strip()}'
 
         # 6. Fallback
-        return f"{prefix} {raw_title}"
+        return f'{prefix} {raw_title}'
 
     return None
 
+
 def extract_title_from_h1(soup):
-    h1 = soup.find("h1")
+    h1 = soup.find('h1')
     if not h1:
-         return None
-     
-    text = h1.get_text(" ", strip=True)
+        return None
+
+    text = h1.get_text(' ', strip=True)
 
     m = re.search(r'[»„“"]\s*Tatort\s*[«“”"]\D*?[»„“"](.+?)[«“”"]', text)
     if m:
-        return f"Tatort: {m.group(1).strip()}"
-    
+        return f'Tatort: {m.group(1).strip()}'
+
     m = re.search(r'Tatort[^\w]+[»„“"](.+?)[«“”"]', text)
     if m:
-        return f"Tatort: {m.group(1).strip()}"
-    
+        return f'Tatort: {m.group(1).strip()}'
+
     m = re.search(r'Polizeiruf.*?:\s*([A-Za-zÄÖÜäöüß0-9\- ]+)', text)
     if m:
-        return f"Polizeiruf: {m.group(1).strip()}"
-    
+        return f'Polizeiruf: {m.group(1).strip()}'
+
     return None
+
 
 def extract_evaluation(evaluation_text):
     m = re.search(r'(\w+)\s+von\b', evaluation_text.lower())
@@ -95,21 +103,21 @@ def extract_evaluation(evaluation_text):
 
     return None
 
+
 def parse_article(url):
     logger.info('Lade Artikel: %s', url)
-    response = requests.get(url, timeout=100)
+    response = requests.get(url, timeout=10)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     h1_tag = soup.find('h1')
 
-    title_raw = extract_title_from_bottom(soup) 
+    title_raw = extract_title_from_bottom(soup)
 
     if not title_raw:
         title_raw = extract_title_from_h1(soup)
 
-    
     if not title_raw:
-        logger.info("Kein Titel gefunden für URL: %s", url)
+        logger.info('Kein Titel gefunden für URL: %s', url)
         title = None
 
     else:
@@ -118,7 +126,7 @@ def parse_article(url):
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
         for i, w in enumerate(words):
-            if w.lower() == "aus" and i + 1 < len(words):
+            if w.lower() == 'aus' and i + 1 < len(words):
                 return words[i + 1].strip('":«»„“')
         return None
 
@@ -130,14 +138,14 @@ def parse_article(url):
     def extract_city_from_h1(h1_text):
         words = h1_text.split()
         for i, w in enumerate(words):
-            if w.lower() == "aus" and i + 1 < len(words):
+            if w.lower() == 'aus' and i + 1 < len(words):
                 return words[i + 1].strip('":«»„“')
         return None
 
     city = None
     if h1_tag:
         h1_text = h1_tag.get_text(strip=True)
-        city = extract_city_from_h1(h1_text) 
+        city = extract_city_from_h1(h1_text)
 
     year = None
     time_tag = soup.find('time', class_='timeformat')
@@ -147,9 +155,7 @@ def parse_article(url):
     evaluation_text = None
     evaluation = None
 
-    evaluation_header = soup.find(
-        string=lambda s: s and 'Bewertung' in s
-    )
+    evaluation_header = soup.find(string=lambda s: s and 'Bewertung' in s)
     if evaluation_header:
         p_tag = evaluation_header.find_parent().find_next('p')
         if p_tag:
@@ -164,6 +170,7 @@ def parse_article(url):
         'Bewertung': evaluation,
         'Link': url,
     }
+
 
 def collect_links(base_url):
     all_links = set()
@@ -197,6 +204,7 @@ def collect_links(base_url):
     logger.info('\nGefundene Artikel insgesamt: %d', len(all_links))
     return all_links
 
+
 def scrape_all_articles(links):
     all_articles = []
 
@@ -208,16 +216,19 @@ def scrape_all_articles(links):
     logger.info('Erfolgreich geparste Artikel: %d', len(all_articles))
     return all_articles
 
-def save_to_table (data, filename):
+
+def save_to_table(data, filename):
     df = pd.DataFrame(data)
     df.to_excel(filename, index=False)
     logger.info("Datei 'tatort_schnellcheck.xlsx' wurde erstellt.")
+
 
 def run_scraper():
     base_url = 'https://www.spiegel.de/thema/tatort_schnellcheck/'
     links = collect_links(base_url)
     articles = scrape_all_articles(links)
-    save_to_table(articles, "tatort_schnellcheck.xlsx")
+    save_to_table(articles, 'tatort_schnellcheck.xlsx')
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     run_scraper()

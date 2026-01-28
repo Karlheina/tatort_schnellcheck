@@ -25,7 +25,7 @@ def load_tatort_episodes():
         page += 1
 
     return episodes
-    
+
 def normalize_title(t):
     if not t:
         return ""
@@ -43,7 +43,7 @@ def ard_is_available(title, episodes):
         episode = title.strip()
 
     episode_norm = normalize_title(episode)
-    
+
     matches = 0
 
     for ep in episodes:
@@ -121,7 +121,7 @@ def is_available_in_ard(title):
 
     except Exception:
         return False
-    
+
 df["ARD_Mediathek"] = df["Titel"].apply(is_available_in_ard)
 
 df.to_excel("tatort_available in ard.xlsx", index=False)
