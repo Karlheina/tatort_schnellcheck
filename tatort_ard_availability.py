@@ -58,70 +58,11 @@ def ard_is_available(title, episodes):
             if not available_to:
                 return False
 
-            available_dt = datetime.fromisoformat(available_to.replace("Z", "+00:00"))
-            return datetime.now(timezone.utc) < available_dt
+            return available_to
 
     return False
 
-df = pd.read_excel("tatort_schnellcheck_test articles.xlsx")
+df = pd.read_excel("tatort_schnellcheck_all articles.xlsx")
 episodes = load_tatort_episodes()
 df["ARD_Mediathek"] = df["Titel"].apply(lambda t: ard_is_available(t, episodes))
 df.to_excel("tatort_verfuegbarkeit.xlsx", index=False)
-
-
-
-
-
-
-
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-import urllib.parse
-
-df = pd.read_excel("tatort_schnellcheck_test articles.xlsx")
-
-def is_available_in_ard(title):
-    if not title:
-        return False
-
-    # Episodentitel extrahieren
-    if ":" in title:
-        episode = title.split(":", 1)[1].strip()
-    else:
-        episode = title.strip()
-
-    query = urllib.parse.quote(episode)
-    url = f"https://www.ardmediathek.de/suche/{query}/"
-
-    try:
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        results = soup.find_all("a", href=True)
-
-        for r in results:
-            text = r.get_text(" ", strip=True).lower()
-
-            # 1. Episodentitel muss vorkommen
-            if episode.lower() not in text:
-                continue
-
-            # 2. Muss Tatort ODER Polizeiruf sein
-            if ("tatort" not in text) and ("polizeiruf" not in text):
-                continue
-
-            # 3. Muss ein ganzer Film sein (ca. 90 Minuten)
-            if not any(m in text for m in ["87 min", "88 min", "89 min", "90 min"]):
-                continue
-
-            return True
-
-        return False
-
-    except Exception:
-        return False
-
-df["ARD_Mediathek"] = df["Titel"].apply(is_available_in_ard)
-
-df.to_excel("tatort_available in ard.xlsx", index=False)
