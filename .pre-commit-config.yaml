@@ -1,0 +1,51 @@
+fail_fast: false
+exclude: ".pgm$|.svg$|.dae$|.casesxml$|.sdxml$"
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-ast
+    -   id: check-case-conflict
+    -   id: check-executables-have-shebangs
+    -   id: check-illegal-windows-names
+    -   id: check-merge-conflict
+    -   id: check-shebang-scripts-are-executable
+    -   id: check-symlinks
+    -   id: check-toml
+    -   id: check-xml
+    -   id: check-yaml
+        args: ["--allow-multiple-documents"]
+    -   id: debug-statements
+    -   id: destroyed-symlinks
+    -   id: detect-private-key
+    -   id: end-of-file-fixer
+    -   id: file-contents-sorter
+    -   id: fix-byte-order-marker
+    -   id: mixed-line-ending
+    -   id: name-tests-test
+        args: ["--pytest-test-first"]
+    -   id: no-commit-to-branch
+    -   id: requirements-txt-fixer
+    -   id: trailing-whitespace
+        exclude_types: [rst]
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.14.10
+  hooks:
+    # Run the linter.
+    - id: ruff
+      args: [--fix]
+    # Run the formatter.
+    - id: ruff-format
+
+-   repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.35.0
+    hooks:
+    -   id: check-github-workflows
+        args: ["--verbose"]
+    -   id: check-github-actions
+        args: ["--verbose"]
+    -   id: check-dependabot
+        args: ["--verbose"]
